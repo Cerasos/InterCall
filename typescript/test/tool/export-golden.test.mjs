@@ -16,6 +16,14 @@ test("export golden source is deterministic and strictly validated", () => {
     assert.equal(build().generatedSource, expected);
 });
 
+test("multiple parameters are emitted as indexed arguments", () => {
+    const project = loadCompilerProject(resolve("test/fixtures/compiler/tsconfig-discovery.json"));
+    const operands = normalizeSourceOperands(project, ["test/fixtures/compiler/multiple-params.ts"]);
+    const generated = buildValidatedExportSource(project, discoverSourceExports(project, operands)).generatedSource;
+    assert.match(generated, /provider_0\["add"\]\(context, values\[0\], values\[1\]\)/);
+    assert.doesNotMatch(generated, /provider_0\["add"\]\(context, \.\.\.values\)/);
+});
+
 test("direct export helpers return fixed malformed and encoding results", () => {
     assert.deepEqual(decodeExportArguments([], [new Uint8Array()]), { ok: false, exception: "invalid_arguments" });
     assert.deepEqual(encodeExportResult(undefined, undefined), { ok: true, payload: new Uint8Array() });

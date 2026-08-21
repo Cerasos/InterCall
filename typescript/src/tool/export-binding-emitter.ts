@@ -41,16 +41,16 @@ function emitProcedure(lines: string[], procedure: DiscoveredProcedure, provider
         lines.push("            let values: any[];", "            try {");
         lines.push(`                values = decodeProgramsFromPayload([${indices}], payload);`);
         lines.push("            } catch {", "                return { exceptionKey: 0x3f5fc972f8477b07n, payload: new Uint8Array() };", "            }", "            try {");
-        emitProviderCall(lines, provider, "...values", file, procedure.wireName, codecs);
+        emitProviderCall(lines, provider, parameters.map((_parameter, index) => `values[${index}]`), file, procedure.wireName, codecs);
     } else if (parameters.length === 1) {
         const parameter = parameters[0]!;
         lines.push("            let value: any;", "            try {");
         lines.push(`                value = decodeProgram(codec${codecs.get(parameter.type as unknown as TypeExpr) ?? 0}, payload);`);
         lines.push("            } catch {", "                return { exceptionKey: 0x3f5fc972f8477b07n, payload: new Uint8Array() };", "            }", "            try {");
-        emitProviderCall(lines, provider, "value", file, procedure.wireName, codecs);
+        emitProviderCall(lines, provider, ["value"], file, procedure.wireName, codecs);
     } else {
         lines.push("            if (payload.byteLength !== 0) return { exceptionKey: 0x3f5fc972f8477b07n, payload: new Uint8Array() };", "            try {");
-        emitProviderCall(lines, provider, "", file, procedure.wireName, codecs);
+        emitProviderCall(lines, provider, [], file, procedure.wireName, codecs);
     }
     lines.push("            } catch (error: any) {");
     lines.push("                let matchCount = 0;", "                let matchedKey = 0n;", "                let matchedPayload: Uint8Array = new Uint8Array();", "                try {");
@@ -58,8 +58,8 @@ function emitProcedure(lines: string[], procedure: DiscoveredProcedure, provider
     lines.push("                    if (matchCount === 1) return { exceptionKey: matchedKey, payload: matchedPayload };", "                    return { exceptionKey: 0x1aaec22e85996f50n, payload: new Uint8Array() };", "                } catch {", "                    return { exceptionKey: 0x1aaec22e85996f50n, payload: new Uint8Array() };", "                }", "            }", "        }");
 }
 
-function emitProviderCall(lines: string[], provider: ExportProviderBinding, value: string, file: InterfaceFile, wireName: string, codecs: ReadonlyMap<TypeExpr, number>): void {
-    const suffix = value === "" ? "" : value === "...values" ? ", ...values" : `, ${value}`;
+function emitProviderCall(lines: string[], provider: ExportProviderBinding, values: readonly string[], file: InterfaceFile, wireName: string, codecs: ReadonlyMap<TypeExpr, number>): void {
+    const suffix = values.map((value) => `, ${value}`).join("");
     const procedure = file.declarations.find((declaration) => declaration.kind === "procedure-decl" && declaration.name.name === wireName);
     const result = procedure?.kind === "procedure-decl" ? procedure.result : undefined;
     const encoded = result === undefined ? "new Uint8Array()" : `encodeProgram(codec${codecs.get(result)!}, result)`;
