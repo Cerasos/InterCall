@@ -1,0 +1,6 @@
+# Generated TypeScript release artifacts and dependencies
+typescript/dist/
+typescript/node_modules/
+
+# npm diagnostics
+npm-debug.log*

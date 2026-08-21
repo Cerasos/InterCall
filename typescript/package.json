@@ -7,18 +7,18 @@
   "author": "Luiz Gustavo Ceraso Filho <gus@ceraso.dev>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gus-ceraso/InterCall.git",
+    "url": "git+https://github.com/Cerasos/InterCall.git",
     "directory": "typescript"
   },
   "bugs": {
-    "url": "https://github.com/gus-ceraso/InterCall/issues"
+    "url": "https://github.com/Cerasos/InterCall/issues"
   },
-  "homepage": "https://github.com/gus-ceraso/InterCall/tree/master/typescript",
+  "homepage": "https://github.com/Cerasos/InterCall/tree/master/typescript",
   "engines": {
     "node": ">=22.0.0"
   },
   "bin": {
-    "intercall-ts": "./dist/cli/main.js"
+    "intercall-ts": "dist/cli/main.js"
   },
   "exports": {
     ".": {
@@ -56,7 +56,8 @@
     "test:browser": "npm run build:browser && playwright test",
     "test:integration": "node --test test/integration/*.test.mjs",
     "check:fixtures": "node test/fixtures/compiler/compiler-experiments.test.mjs && node --test test/fixtures/syntax-integrity.test.mjs",
-    "pack:check": "npm pack --dry-run"
+    "pack:check": "npm pack --dry-run",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "typescript": "5.9.3"
