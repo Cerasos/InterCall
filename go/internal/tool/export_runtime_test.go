@@ -159,6 +159,23 @@ func TestExportDispatchDirect(t *testing.T) {
 		}
 	})
 
+	t.Run("fixed runtime sentinels", func(t *testing.T) {
+		for _, test := range []struct {
+			value string
+			key   uint64
+		}{
+			{"invalid_arguments", invalidArgs},
+			{"procedure_not_found", procNotFound},
+			{"internal_exception", internal},
+		} {
+			payload := mustVec(exportfixture.Codecs.EncodeString(nil, test.value))
+			excKey, resp := callDispatch(t, echoKey, payload)
+			if excKey != test.key || len(resp) != 0 {
+				t.Fatalf("%s = %#x, %d bytes; want %#x", test.value, excKey, len(resp), test.key)
+			}
+		}
+	})
+
 	t.Run("denied sentinel", func(t *testing.T) {
 		payload := mustVec(exportfixture.Codecs.EncodeString(nil, "denied"))
 		excKey, resp := callDispatch(t, echoKey, payload)

@@ -475,23 +475,10 @@ func (e *exportEmitter) emit(pkg string) ([]byte, error) {
 	for _, p := range e.model.Procs {
 		e.emitRequestDecoder(p)
 	}
-	if e.hasApplicationExceptions() {
-		e.emitMatcher()
-	}
+	e.emitMatcher()
 	e.emitDispatch()
 	e.emitSingleton()
 	return format.Source(e.src.bytes())
-}
-
-// hasApplicationExceptions reports whether the interface has at least
-// one application exception for the matcher to test.
-func (e *exportEmitter) hasApplicationExceptions() bool {
-	for _, x := range e.model.Exceptions {
-		if !x.Fixed {
-			return true
-		}
-	}
-	return false
 }
 
 // emitImports emits the import block: the fixed standard library and
@@ -601,9 +588,25 @@ func (e *exportEmitter) emitMatcher() {
 	e.src.linef("var excKey uint64")
 	e.src.linef("var excPayload []byte")
 	e.src.linef("var encErr error")
+	e.src.linef("if err == intercall.ErrProcedureNotFound {")
+	e.src.open()
+	e.src.linef("return 0x%x, nil", exportProcedureNotFoundKey)
+	e.src.close()
+	e.src.linef("}")
+	e.src.linef("if err == intercall.ErrInvalidArguments {")
+	e.src.open()
+	e.src.linef("return 0x%x, nil", exportInvalidArgumentsKey)
+	e.src.close()
+	e.src.linef("}")
+	e.src.linef("if err == intercall.ErrInternalException {")
+	e.src.open()
+	e.src.linef("return 0x%x, nil", exportInternalExceptionKey)
+	e.src.close()
+	e.src.linef("}")
+	e.src.blank()
 	for _, x := range e.model.Exceptions {
 		if x.Fixed {
-			continue // runtime conditions select the fixed exceptions
+			continue // fixed sentinels were matched above
 		}
 		gt := e.qual(x.Pkg.Path) + "." + x.GoName
 		switch x.Match {
@@ -644,7 +647,6 @@ func (e *exportEmitter) emitMatcher() {
 // the no-payload internal_exception; a panic anywhere in the case body
 // escapes to the runtime's recovery around the complete dispatch.
 func (e *exportEmitter) emitDispatch() {
-	hasApp := e.hasApplicationExceptions()
 	e.src.linef("func %s(%s context.Context, %s uint64, %s []byte) (uint64, []byte) {", dispatchName, dispatchCtxName, dispatchKeyName, dispatchPayloadName)
 	e.src.open()
 	e.src.linef("switch %s {", dispatchKeyName)
@@ -652,7 +654,7 @@ func (e *exportEmitter) emitDispatch() {
 	for _, p := range e.model.Procs {
 		e.src.linef("case 0x%x:", p.Key)
 		e.src.open()
-		e.emitProcCase(p, hasApp)
+		e.emitProcCase(p)
 		e.src.close()
 	}
 	e.src.linef("default:")
@@ -667,7 +669,7 @@ func (e *exportEmitter) emitDispatch() {
 }
 
 // emitProcCase emits one procedure arm of the static switch.
-func (e *exportEmitter) emitProcCase(p *ExportProc, hasApp bool) {
+func (e *exportEmitter) emitProcCase(p *ExportProc) {
 	reqdec := codecName("dereq", p.WireName)
 	if len(p.Params) > 0 {
 		names := make([]string, len(p.Params))
@@ -699,11 +701,7 @@ func (e *exportEmitter) emitProcCase(p *ExportProc, hasApp bool) {
 	}
 	e.src.linef("if err != nil {")
 	e.src.open()
-	if hasApp {
-		e.src.linef("return %s(err)", matcherName)
-	} else {
-		e.src.linef("return 0x%x, nil", exportInternalExceptionKey)
-	}
+	e.src.linef("return %s(err)", matcherName)
 	e.src.close()
 	e.src.linef("}")
 	if p.Result != nil {

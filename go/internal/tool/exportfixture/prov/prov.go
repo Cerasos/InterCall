@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	intercall "github.com/cerasos/intercall/go"
 )
 
 // ErrDenied is the denied sentinel.
@@ -92,6 +94,12 @@ type Point struct {
 // @return The unchanged input.
 func Echo(ctx context.Context, value string) (string, error) {
 	switch value {
+	case "invalid_arguments":
+		return "", intercall.ErrInvalidArguments
+	case "procedure_not_found":
+		return "", intercall.ErrProcedureNotFound
+	case "internal_exception":
+		return "", intercall.ErrInternalException
 	case "denied":
 		return "", ErrDenied
 	case "failed":

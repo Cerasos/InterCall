@@ -505,6 +505,14 @@ func TestCLIGeneratedTypeFailureNoMutation(t *testing.T) {
 			"fake/fake.go": `// Package intercall is the fake runtime of the checker-failure fixture.
 package intercall
 
+import "errors"
+
+var (
+	ErrProcedureNotFound = errors.New("procedure_not_found")
+	ErrInvalidArguments = errors.New("invalid_arguments")
+	ErrInternalException = errors.New("internal_exception")
+)
+
 // ExportBinding is the fake runtime's binding type.
 type ExportBinding struct{}
 

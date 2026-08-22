@@ -509,6 +509,16 @@ func _intercallmatch_exc_6eefd8396f76a36d(err error) (uint64, []byte) {
 	var excKey uint64
 	var excPayload []byte
 	var encErr error
+	if err == intercall.ErrProcedureNotFound {
+		return 0x970e76fcc5e2dacb, nil
+	}
+	if err == intercall.ErrInvalidArguments {
+		return 0x3f5fc972f8477b07, nil
+	}
+	if err == intercall.ErrInternalException {
+		return 0x1aaec22e85996f50, nil
+	}
+
 	if err == error(prov.ErrDenied) {
 		match++
 		excKey = 0x7fbdf637a78620b0

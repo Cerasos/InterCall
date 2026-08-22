@@ -109,7 +109,7 @@ func TestExportGeneration(t *testing.T) {
 			}
 		}
 		for _, gone := range []string{
-			"errors.Is", "errors.As", "err.(*prov.ErrDenied)", "intercall.ErrProcedureNotFound",
+			"errors.Is", "errors.As", "err.(*prov.ErrDenied)",
 		} {
 			if strings.Contains(gen, gone) {
 				t.Errorf("generated binding contains %q", gone)
@@ -171,8 +171,8 @@ func TestExportGeneration(t *testing.T) {
 		if !strings.Contains(gen, "default:\n\t\treturn 0x970e76fcc5e2dacb, nil") {
 			t.Error("the empty dispatch lacks the procedure_not_found default arm")
 		}
-		if strings.Contains(gen, matcherName) {
-			t.Error("an interface without application exceptions must not emit the matcher")
+		if !strings.Contains(gen, matcherName) {
+			t.Error("an interface without application exceptions must still emit the fixed-error matcher")
 		}
 		if !strings.Contains(gen, "func ExportBinding() intercall.ExportBinding {") {
 			t.Error("the empty binding lacks the ExportBinding function")
@@ -190,9 +190,8 @@ func TestExportGeneration(t *testing.T) {
 	})
 
 	t.Run("no application exceptions", func(t *testing.T) {
-		// A provider-only interface: the dispatch returns
-		// internal_exception directly on every provider error, with no
-		// matcher.
+		// A provider-only interface still emits the fixed-sentinel matcher so
+		// providers can return procedure_not_found and invalid_arguments.
 		model := exportOne(t, "example.com/synth", `package synth
 
 import "context"
@@ -205,14 +204,14 @@ func Ping(ctx context.Context) error { return nil }
 			t.Fatalf("GenerateExport: %v", err)
 		}
 		gen := string(goFile)
-		if strings.Contains(gen, matcherName) {
-			t.Error("a provider-only interface must not emit the matcher")
+		if !strings.Contains(gen, matcherName) {
+			t.Error("a provider-only interface must emit the fixed-error matcher")
 		}
 		if !strings.Contains(gen, "if err != nil {") || !strings.Contains(gen, "return 0x1aaec22e85996f50, nil") {
 			t.Error("the provider-only dispatch lacks the direct internal_exception fallback")
 		}
-		if strings.Contains(gen, "return "+matcherName) {
-			t.Error("the provider-only dispatch still calls the matcher")
+		if !strings.Contains(gen, "return "+matcherName) {
+			t.Error("the provider-only dispatch must call the matcher")
 		}
 		typeCheckSyntheticExportBinding(t, map[string]string{"example.com/synth": `package synth
 
