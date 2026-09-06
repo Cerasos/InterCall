@@ -130,6 +130,14 @@ func TestWaitForHandlersJoinsPausedDispatch(t *testing.T) {
 	oldWait := make(chan error, 1)
 	go func() { oldWait <- c.Wait() }()
 	requireWaitResult(t, oldWait, ErrClosed)
+	// Wait has joined the receive loop while the admitted handler is still
+	// paused. This is the initial Add-before-launch/read-exit boundary: the
+	// handler count must already be nonzero when the owner starts its barrier.
+	select {
+	case <-c.receiveExit:
+	default:
+		t.Fatal("Wait returned before the receive loop exited")
+	}
 
 	barrier := barrierWait(t, c)
 	requireBarrierBlocked(t, barrier)
