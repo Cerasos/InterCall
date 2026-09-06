@@ -11,7 +11,10 @@
 // A connection is constructed with NewConnection over an established
 // ByteStream, bound into a context with WithConnection, retrieved by
 // generated callers with ConnectionFromContext, and ended with Close and
-// Wait. Raw NewConnection starts directly at the first InterCall frame and
+// Wait. An external owner that must join complete request-handler lifetimes
+// uses the additive WaitForHandlers method after terminal teardown; Close and
+// Wait themselves retain their non-handler-waiting semantics. Raw NewConnection
+// starts directly at the first InterCall frame and
 // does not negotiate. NewNegotiatedClientConnection and
 // NewNegotiatedServerConnection perform only the optional interface-ID
 // agreement before constructing that same raw connection; they do not dial or

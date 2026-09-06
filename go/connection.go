@@ -63,6 +63,14 @@ type Connection struct {
 	connCtx        context.Context // parent of handler contexts
 	cancelHandlers context.CancelFunc
 
+	// Handler lifetime state. Every handler launched by the receive loop is
+	// counted before its goroutine starts and releases one count only after
+	// its complete dispatch, response, write, or terminal-discard path. A
+	// deferred same-ID generation is added while its parent still holds a
+	// count, so WaitForHandlers can wait after receiveExit without racing a
+	// valid launch.
+	handlers sync.WaitGroup
+
 	// Lifecycle completion channels. observerExit closes when the context
 	// observer goroutine exits, receiveExit when the sole receive-loop
 	// goroutine exits, and teardown when the asynchronous cleanup owner
@@ -166,6 +174,23 @@ func (c *Connection) Wait() error {
 	cause := c.cause
 	c.mu.Unlock()
 	return cause
+}
+
+// WaitForHandlers is the owner-side lifecycle barrier. It first waits for the
+// existing connection teardown, receive loop, and context observer through
+// Wait, then waits for every request handler admitted by the connection. The
+// handler count covers dispatch, response construction, write admission and
+// write, or terminal discard, including deferred same-ID generations. It has
+// no timeout or forced cancellation and may therefore block indefinitely when
+// a handler ignores cancellation. Do not call it from an active handler or
+// stream cleanup; Close and Wait intentionally do not call it.
+func (c *Connection) WaitForHandlers() error {
+	if c == nil {
+		return ErrInvalidArgument
+	}
+	err := c.Wait()
+	c.handlers.Wait()
+	return err
 }
 
 // selectTerminal attempts to select err as the permanent terminal cause. All

@@ -54,7 +54,7 @@ func (c *Connection) receiveLoop() {
 				c.selectTerminal(fmt.Errorf("intercall: incoming request ID %d already active: %w", hdr.requestID, ErrProtocol))
 				return
 			case admissionDispatch:
-				go c.handleRequest(hdr.requestID, hdr.key, payload)
+				c.startHandler(hdr.requestID, hdr.key, payload)
 			}
 		}
 	}
@@ -185,6 +185,20 @@ func (c *Connection) completeIncomingWrite(id uint64) *deferredRequest {
 	return deferred
 }
 
+// startHandler counts one admitted request before launching its unbounded
+// handler goroutine. The count is released by the goroutine only after
+// handleRequest has completed its entire dispatch, response, write, or
+// terminal-discard path. Callers must invoke this before every handler launch;
+// in particular, a deferred same-ID generation is started here while its
+// parent handler still holds its count.
+func (c *Connection) startHandler(id, key uint64, payload []byte) {
+	c.handlers.Add(1)
+	go func() {
+		defer c.handlers.Done()
+		c.handleRequest(id, key, payload)
+	}()
+}
+
 // handleRequest executes one incoming call in its own unbounded handler
 // goroutine. The receive loop admitted the request ID before starting it and
 // transferred the complete owned payload, which the runtime never reuses.
@@ -240,7 +254,10 @@ func (c *Connection) handleRequest(id, key uint64, payload []byte) {
 	// before the final local Write returned; the new handler is started
 	// after the gate is released so it can contend for it normally.
 	if deferred := c.completeIncomingWrite(id); deferred != nil {
-		go c.handleRequest(id, deferred.key, deferred.payload)
+		// The current handler still owns its handler count here. Add the
+		// deferred generation before launching it so a zero-counter wait
+		// cannot race this valid same-ID reuse.
+		c.startHandler(id, deferred.key, deferred.payload)
 	}
 }
 

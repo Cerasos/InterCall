@@ -56,7 +56,11 @@ Do not infer current behavior from `PLAN.md` when it disagrees with the code or
   stream's `Read`, `Write`, or `Close`. Preserve the documented lock order.
 - Preserve connection ownership and lifecycle semantics: first terminal cause
   wins, `Close` remains prompt, and `Wait` observes completed teardown without
-  waiting for handlers that ignore cancellation.
+  waiting for handlers that ignore cancellation. The additive owner-side
+  `WaitForHandlers` barrier first joins that existing `Wait` completion and then
+  waits for every admitted handler, including deferred same-ID generations;
+  it returns the same terminal cause and must not be called by an active
+  handler or by stream cleanup.
 - Preserve exact context errors where specified. Wrapped transport and protocol
   errors must retain `errors.Is`/`errors.As` identity.
 - Public error sentinels are comparable contracts. Do not casually change their

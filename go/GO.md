@@ -221,6 +221,24 @@ func main() {
 no binding. A generated caller on a context without a connection returns
 that sentinel without touching the wire.
 
+An external connection owner that must join provider execution after transport
+teardown uses the additive handler barrier:
+
+```go
+_ = conn.Close()
+err := conn.WaitForHandlers()
+// err is the same permanent terminal cause as conn.Wait().
+```
+
+`WaitForHandlers` first performs `Wait`, then waits for every request handler's
+complete lifetime, including dispatch, response construction, write, and
+terminal discard. It counts each handler before launch, including a deferred
+same-ID generation before its parent handler finishes. It has no timeout or
+forced cancellation and can therefore wait indefinitely for a handler that
+ignores cancellation. It is an owner-only operation: do not call it from an
+active handler or from stream cleanup. `Close` and `Wait` keep their existing
+prompt/non-handler-waiting behavior.
+
 ## Native transports
 
 Generated bindings now carry a canonical-body SHA-256 `InterfaceID`. Use raw
@@ -407,6 +425,7 @@ lifecycle, the context binding functions, and fixed error sentinels:
 | `NewNegotiatedClientConnection` / `NewNegotiatedServerConnection` | Exchange expected-peer interface IDs, then construct the same connection. |
 | `(*Connection).Call(ctx, imp, key, encode, decode)` | Place one outgoing request and wait for its single outcome (generated-code SPI). |
 | `(*Connection).Close()` / `(*Connection).Wait()` | `Close` returns promptly after terminal publication and never waits for a blocked writer, gate waiter, handler, or stream cleanup; `Wait` blocks until teardown and stream cleanup complete and returns the permanent terminal cause, which is never nil. |
+| `(*Connection).WaitForHandlers()` | Owner-only additive barrier: first waits exactly as `Wait` does, then waits for every admitted request handler, and returns the same permanent terminal cause. It has no timeout and does not change `Close` or `Wait`. |
 | `WithConnection(ctx, conn)` / `ConnectionFromContext(ctx)` | Bind a connection into a context under a private key and retrieve it; the nil cases follow the documented panic and sentinel contracts. |
 
 Error sentinels work with direct comparison and `errors.Is`:

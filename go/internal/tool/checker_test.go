@@ -162,8 +162,8 @@ func TestRuntimeSPIModelParity(t *testing.T) {
 	// whose Connection.Call carries an extra parameter must be reported
 	// as differing from the root package, while the unaltered model
 	// keeps matching. Without the method comparison, the modeled
-	// Call/Close/Wait signatures would not be pinned to the root
-	// package.
+	// Call/Close/Wait/WaitForHandlers signatures would not be pinned to the
+	// root package.
 	t.Run("modeled method drift is detected", func(t *testing.T) {
 		altered := alteredConnection(t, model)
 		if msg := parityObject("Connection", altered, actual.Scope().Lookup("Connection")); msg == "" {
@@ -311,9 +311,9 @@ func TestRuntimeSPIParityTargetedDrift(t *testing.T) {
 }
 
 // alteredConnection builds one model-shaped Connection whose Call
-// method carries an extra int parameter, with Close and Wait identical
-// to the real model, so the parity comparison can only attribute the
-// difference to the Call signature.
+// method carries an extra int parameter, with Close, Wait, and
+// WaitForHandlers identical to the real model, so the parity comparison can
+// only attribute the difference to the Call signature.
 func alteredConnection(t *testing.T, model *types.Package) types.Object {
 	t.Helper()
 	noPos := token.NoPos
@@ -344,6 +344,7 @@ func alteredConnection(t *testing.T, model *types.Package) types.Object {
 		types.NewTuple(types.NewVar(noPos, pkg, "", errType)))
 	addMethod("Close", types.NewTuple(), types.NewTuple(types.NewVar(noPos, pkg, "", errType)))
 	addMethod("Wait", types.NewTuple(), types.NewTuple(types.NewVar(noPos, pkg, "", errType)))
+	addMethod("WaitForHandlers", types.NewTuple(), types.NewTuple(types.NewVar(noPos, pkg, "", errType)))
 	return tn
 }
 
@@ -450,9 +451,9 @@ func bridgeTypesEqualSeen(a, b types.Type, seen map[[2]types.Type]bool) bool {
 		}
 		seen[key] = true
 		// The exported method sets are part of the generated-code
-		// bridge surface: Connection's Call, Close, and Wait are
-		// modeled signatures that generated import bindings call, so a
-		// method drift in either direction must fail the parity test.
+		// bridge surface: Connection's Call, Close, Wait, and
+		// WaitForHandlers are modeled signatures, so a method drift in either
+		// direction must fail the parity test.
 		if !bridgeMethodsEqual(x, y, seen) {
 			return false
 		}

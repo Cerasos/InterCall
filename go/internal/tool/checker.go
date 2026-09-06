@@ -435,6 +435,7 @@ func buildRuntimeSPIModel(imp types.Importer) (*types.Package, error) {
 		types.NewTuple(types.NewVar(noPos, pkg, "", errType)))
 	addMethod("Close", types.NewTuple(), types.NewTuple(types.NewVar(noPos, pkg, "", errType)))
 	addMethod("Wait", types.NewTuple(), types.NewTuple(types.NewVar(noPos, pkg, "", errType)))
+	addMethod("WaitForHandlers", types.NewTuple(), types.NewTuple(types.NewVar(noPos, pkg, "", errType)))
 
 	insert(types.NewFunc(noPos, pkg, "NewExportBinding", types.NewSignatureType(nil, nil, nil,
 		types.NewTuple(types.NewVar(noPos, pkg, "dispatch", dispatch)),

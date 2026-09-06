@@ -641,6 +641,7 @@ func (c *Connection) Call(
 	ResponseDecoder,
 ) error
 func (c *Connection) Wait() error
+func (c *Connection) WaitForHandlers() error
 func (c *Connection) Close() error
 
 func WithConnection(context.Context, *Connection) context.Context
@@ -743,13 +744,24 @@ case, terminal publication completes under the state lock before `Close`
 returns. `Close` never waits for the receive loop, observer, handlers, blocked
 gate waiters, or stream cleanup. `Wait` waits for the receive loop, complete
 terminal teardown and stream cleanup, and context-observer exit, then returns
-the permanent terminal cause; it never returns nil. Thus EOF under
+the permanent terminal cause; it never returns nil. `Wait` retains this
+non-handler-waiting contract. The additive owner-side `WaitForHandlers` method
+first performs that existing `Wait` completion, then waits for one per-connection
+handler `sync.WaitGroup`, and returns the same permanent terminal cause. The
+receive loop stops before the zero-counter wait; every normal handler is counted
+before its goroutine launch, and a deferred same-ID generation is counted before
+launch while its parent handler is still counted. The count covers the complete
+handler lifetime: dispatch argument decoding, provider execution, response
+encoding, frame construction, write admission and write, or terminal discard.
+`WaitForHandlers` has no grace period or cancellation override, so a handler
+that ignores cancellation may delay it indefinitely. It is for an external
+connection owner and must not be called from an active handler or stream
+cleanup; neither `Close` nor `Wait` calls it. Thus EOF under
 `context.Background` cannot strand the observer, `context.WithCancelCause`
 yields exactly `context.Canceled` rather than its cause, a cause-bearing deadline
 yields `context.DeadlineExceeded`, and Close/cancellation races retain whichever
-exact cause wins the common selection lock. Handlers that ignore cancellation
-may outlive both methods, but terminal state prevents them from beginning a
-later response write.
+exact cause wins the common selection lock. Terminal state still prevents a
+handler from beginning a later response write.
 
 The root package exports only these local classifications:
 
@@ -802,9 +814,12 @@ payload slice and cannot consume a later frame.
 
 Each request transfers its complete payload to one new, unbounded handler
 goroutine. Before starting it, the receive loop reserves the incoming request ID
-in an active set, and request admission is ordered against terminal publication:
-a buffered frame is never dispatched after terminal has won. Incoming and
-outgoing ID spaces are independent.
+in an active set and increments the connection's handler lifetime counter before
+launching the goroutine. Request admission is ordered against terminal
+publication: a buffered frame is never dispatched after terminal has won.
+Incoming and outgoing ID spaces are independent. A deferred same-ID generation
+is counted before its goroutine launch while the current handler remains
+counted, so an owner-side zero-counter wait cannot race a valid launch.
 
 README permits a peer to reuse a request ID as soon as it has received the
 complete prior response, but `ByteStream` exposes no peer-delivery
@@ -908,7 +923,9 @@ A handler's incoming ID remains active until its complete response write
 succeeds; a duplicate observed during that write becomes the deferred next
 generation defined under Reading, dispatch, and response validation. A handler
 waiting for the gate abandons its response after terminal selection; a handler
-already writing is unblocked by stream closure.
+already writing is unblocked by stream closure. The handler lifetime counter is
+released only after this full path, including deferred-generation admission,
+has finished.
 
 Generated append encoders and bounded decoders implement the exact wire rules in
 `README.md`, including:
