@@ -398,6 +398,11 @@ paths, or map-order-dependent data. Generated artifacts are intended to be
 checked into version control, and regeneration over an unchanged interface
 is a no-op.
 
+For the complete race-suite gate, use `go test -race -timeout 30m ./...`.
+On the reference environment it took about 18 minutes (`internal/tool` alone
+about 15 minutes), so the default ten-minute timeout is insufficient; use a
+focused package or test while iterating.
+
 ## Runtime reference
 
 Framing is bounded by a mandatory implementation-safety ceiling: the exact
